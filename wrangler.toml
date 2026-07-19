@@ -1,0 +1,22 @@
+# Cron-only Cloudflare Worker that says "hi" to Claude on a schedule.
+#
+# Cron Triggers are UTC-only. The default below maps to these IST send-times:
+#
+#   IST 06:00 -> UTC 00:30
+#   IST 11:00 -> UTC 05:30
+#   IST 16:00 -> UTC 10:30
+#   IST 21:00 -> UTC 15:30
+#
+# CLAUDE_CODE_OAUTH_TOKEN is set as an encrypted secret, NOT here:
+#   npx wrangler secret put CLAUDE_CODE_OAUTH_TOKEN
+
+name = "claude-hi"
+main = "src/index.js"
+compatibility_date = "2026-06-29"
+
+# Cron-only: disables the *.workers.dev URL so the Worker can't be triggered
+# anonymously (it has no `fetch` handler either).
+workers_dev = false
+
+[triggers]
+crons = ["30 0,5,10,15 * * *"]
