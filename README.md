@@ -1,5 +1,7 @@
 # Claude "Hi" Cron (Cloudflare Worker)
 
+![Claude Cron Header](github_assets/ReadMe_Header.png)
+
 A tiny [Cloudflare Worker](https://workers.cloudflare.com/) that says **"hi"** to
 Claude on a schedule, drawing from your Claude **subscription** (Pro/Max) rather
 than pay-per-token API credits.
