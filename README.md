@@ -35,11 +35,16 @@ npx wrangler login
 # 4. Deploy the Worker
 npx wrangler deploy
 
-# 5. Store your token as an encrypted secret (paste it when prompted)
+# 5. Store your token as an encrypted secret.
+#    NOTE: the command takes only the NAME — it prompts for the value.
+#    Do NOT write `... CLAUDE_CODE_OAUTH_TOKEN=sk-ant-...` (that becomes the name).
 npx wrangler secret put CLAUDE_CODE_OAUTH_TOKEN
+# ...or pipe it non-interactively (avoids paste/line-wrap issues):
+printf %s 'sk-ant-oat...' | npx wrangler secret put CLAUDE_CODE_OAUTH_TOKEN
 ```
 
-That's it — the Worker now runs on the schedule automatically.
+That's it — the Worker now runs on the schedule automatically. To get a Slack
+alert when a run fails, see **Failure alerts** below.
 
 ## Verify it works
 
@@ -55,6 +60,34 @@ curl "http://localhost:8787/__scheduled?cron=30+0,5,10,15+*+*+*"
 Look for `Claude replied: ...` in the logs. For a real run, watch live logs with
 `npx wrangler tail`, or check the dashboard under **Workers → claude-hi → Cron
 Events**.
+
+## Failure alerts (Slack)
+
+If a run fails (e.g. the token expired → **HTTP 401**), the Worker posts a
+formatted [Block Kit](https://api.slack.com/block-kit) card — the error, a
+timestamp, and an image — to a Slack channel. It's **optional**: with no webhook
+set, the alert code is a no-op and the Worker runs normally.
+
+```bash
+# 1. Create a Slack Incoming Webhook for the target channel, copy the URL:
+#    https://api.slack.com/messaging/webhooks
+# 2. Store it as a secret (pipe it so nothing gets mangled):
+printf %s 'https://hooks.slack.com/services/XXX/YYY/ZZZ' \
+  | npx wrangler secret put SLACK_WEBHOOK_URL
+```
+
+Takes effect on the next run — no redeploy needed after setting the secret.
+
+**About the image:** Slack Incoming Webhooks **can't upload files**, so the card
+references an image by **public URL** (`ERROR_IMAGE_URL` in `src/index.js`). It
+points at this repo's raw GitHub file. If you fork/rename the repo or swap the
+image, update that URL to your own public URL and redeploy. Test the whole card
+without waiting for a real failure:
+
+```bash
+curl -X POST "$SLACK_WEBHOOK_URL" -H 'content-type: application/json' \
+  -d '{"text":"claude-hi test alert"}'
+```
 
 ## Change the schedule
 
@@ -80,7 +113,8 @@ times to UTC and set the fields accordingly.
   `MODEL` in `src/index.js` if you want.
 - The OAuth token does **not** auto-refresh. If it expires, mint a new one
   (`claude setup-token`) and re-run `npx wrangler secret put
-  CLAUDE_CODE_OAUTH_TOKEN`.
+  CLAUDE_CODE_OAUTH_TOKEN`. Set up **Failure alerts** above so you find out the
+  moment it lapses instead of noticing silence.
 - Cron-only: no public HTTP endpoint (`workers_dev = false`, no `fetch`
   handler), so nobody can trigger it anonymously to spend your quota.
 
