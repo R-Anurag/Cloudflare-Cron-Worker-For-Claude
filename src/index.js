@@ -45,7 +45,7 @@ async function sendHi(env) {
 // set. The image is referenced by public URL — incoming webhooks can't upload
 // files — so it must be reachable by Slack (the repo's raw GitHub URL).
 const ERROR_IMAGE_URL =
-  "https://raw.githubusercontent.com/R-Anurag/Claude-Cron/master/github_assets/ClaudeTokenExpired.png";
+  "https://raw.githubusercontent.com/R-Anurag/Cloudflare-Cron-Worker-For-Claude/master/github_assets/ClaudeTokenExpired.png";
 
 async function notifySlack(env, err, scheduledTimeMs) {
   const url = env.SLACK_WEBHOOK_URL;
