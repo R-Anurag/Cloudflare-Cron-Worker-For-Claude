@@ -41,13 +41,61 @@ async function sendHi(env) {
   return reply;
 }
 
+// Slack error card with the "token expired" image. No-op if the webhook isn't
+// set. The image is referenced by public URL — incoming webhooks can't upload
+// files — so it must be reachable by Slack (the repo's raw GitHub URL).
+const ERROR_IMAGE_URL =
+  "https://raw.githubusercontent.com/R-Anurag/Claude-Cron/master/github_assets/ClaudeTokenExpired.png";
+
+async function notifySlack(env, err, scheduledTimeMs) {
+  const url = env.SLACK_WEBHOOK_URL;
+  if (!url) return;
+  const ts = Math.floor(scheduledTimeMs / 1000);
+  await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      text: `claude-hi cron failed: ${err.message}`, // fallback / notification
+      blocks: [
+        {
+          type: "header",
+          text: { type: "plain_text", text: "🚨 claude-hi cron failed", emoji: true },
+        },
+        {
+          type: "section",
+          text: { type: "mrkdwn", text: "*Error*\n```" + err.message + "```" },
+        },
+        {
+          type: "context",
+          elements: [
+            { type: "mrkdwn", text: `*Worker:* claude-hi` },
+            { type: "mrkdwn", text: `*When:* <!date^${ts}^{date_short_pretty} {time}|${new Date(scheduledTimeMs).toISOString()}>` },
+          ],
+        },
+        { type: "image", image_url: ERROR_IMAGE_URL, alt_text: "Claude token expired" },
+        {
+          type: "context",
+          elements: [
+            { type: "mrkdwn", text: "Fix: re-run `claude setup-token`, then `wrangler secret put CLAUDE_CODE_OAUTH_TOKEN`" },
+          ],
+        },
+      ],
+    }),
+  });
+}
+
 export default {
   // Fires on the cron schedule in wrangler.toml. Cron-only by design: no `fetch`
   // handler, so the Worker exposes no public HTTP trigger. Test via
   // `wrangler dev --test-scheduled`.
   async scheduled(event, env, ctx) {
     ctx.waitUntil(
-      sendHi(env).catch((err) => console.error("cron send failed:", err)),
+      sendHi(env).catch(async (err) => {
+        console.error("cron send failed:", err);
+        await notifySlack(env, err, event.scheduledTime).catch((e) =>
+          console.error("slack notify failed:", e),
+        );
+      }),
     );
   },
 };
